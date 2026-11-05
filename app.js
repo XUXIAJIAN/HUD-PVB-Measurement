@@ -32,7 +32,9 @@ $('chart').on('plotly_legenddoubleclick',()=>false);
 
 // Combining samples is independent of their chart visibility.
 function averageSelection(){return [...$('average-options').querySelectorAll('input:checked')].map(e=>datasets.find(d=>d.id===Number(e.value))).filter(Boolean)}
-function averageCount(){$('average-count').textContent=`已选择 ${averageSelection().length} 个样本（至少 2 个）`;$('average-error').textContent=''}
+function averageLabel(){return [...new Set(averageSelection().map(d=>d.name.replace(/\.csv$/i,'').replace(/(data\d{8})\d+(?=_|$)/gi,'$1')))].join('、')}
+let suggestedAverageName='';
+function averageCount(){const input=$('average-name');if(!input.value.trim()||input.value===suggestedAverageName)input.value=averageLabel();suggestedAverageName=averageLabel();$('average-count').textContent=`已选择 ${averageSelection().length} 个样本（至少 2 个）`;$('average-error').textContent=''}
 $('average-open').onclick=()=>{
  $('average-options').replaceChildren();
  datasets.forEach(d=>{const label=document.createElement('label'),input=document.createElement('input'),text=document.createElement('span');label.className='average-check';input.type='checkbox';input.value=d.id;input.checked=!d.aggregate;input.onchange=averageCount;text.textContent=d.name+(d.aggregate?'（已合成）':'');label.append(input,text);$('average-options').append(label)});
