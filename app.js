@@ -4,22 +4,21 @@ const eyeColors=['#008caa','#bc7b14','#9461c2'];
 [[338,465],[408,532],[469,620]].forEach((e,i)=>{const r=document.createElement('div');r.className='eyerow';r.innerHTML=`<span class="eyetag" style="color:${eyeColors[i]}">EB${i+1}</span><input aria-label="EB${i+1} 左边界" type="number" step="any" value="${e[0]}"><input aria-label="EB${i+1} 右边界" type="number" step="any" value="${e[1]}">`;$('eyes').append(r);r.querySelectorAll('input').forEach(x=>x.addEventListener('input',()=>render()))});
 function say(s,error=false){$('message').textContent=s;$('message').classList.toggle('error',error)}
 function settings(){const H=PVB.num($('window').value),n=Number($('smooth').value);if(!Number.isFinite(H)||H<=0)throw Error('请输入大于0的斜率窗口');const eyes=[...$('eyes').children].map((r,i)=>{const [l,h]=[...r.querySelectorAll('input')].map(e=>PVB.num(e.value));if(!Number.isFinite(l)||!Number.isFinite(h)||l>=h)throw Error(`EB${i+1} 需要有效边界，且左边界小于右边界`);return[l,h]});return{H,n,eyes}}
-function add(name,data){datasets.push({id:nextId++,name,data,visible:true,color:colors[datasets.length%colors.length]});updateList()}
-function updateList(){$('datasets').replaceChildren();datasets.forEach(d=>{const row=document.createElement('div'),toggle=document.createElement('input'),dot=document.createElement('i'),s=document.createElement('span'),b=document.createElement('button');toggle.type='checkbox';toggle.className='dataset-toggle';toggle.checked=d.visible;toggle.ariaLabel='显示曲线 '+d.name;toggle.title='显示／隐藏此样本曲线';toggle.onchange=()=>{d.visible=toggle.checked;updateList();render()};row.classList.toggle('dataset-hidden',!d.visible);dot.className='dot';dot.style.background=d.color;s.textContent=`${d.name} · ${d.data.length} 点`;s.onclick=()=>{d.visible=!d.visible;updateList();render()};s.title=d.aggregate?'平均厚度曲线；来源：'+d.sources.join('、'):'点击显示／隐藏曲线';b.textContent='×';b.ariaLabel='移除 '+d.name;b.onclick=()=>{datasets=datasets.filter(x=>x.id!==d.id);updateList();render()};row.append(toggle,dot,s,b);$('datasets').append(row)})}
+function nextCurveColor(){const used=new Set(datasets.map(d=>d.color.toLowerCase()));const available=colors.find(c=>!used.has(c));if(available)return available;let seed=nextId,color;do{color='#'+((seed++*2654435761)>>>8).toString(16).padStart(6,'0')}while(used.has(color));return color}
+function add(name,data){datasets.push({id:nextId++,name,data,visible:true,color:nextCurveColor()});updateList()}
+function updateList(){$('datasets').replaceChildren();datasets.forEach(d=>{const row=document.createElement('div'),toggle=document.createElement('input'),dot=document.createElement('input'),s=document.createElement('span'),b=document.createElement('button');toggle.type='checkbox';toggle.className='dataset-toggle';toggle.checked=d.visible;toggle.ariaLabel='显示曲线 '+d.name;toggle.title='显示／隐藏此样本曲线';toggle.onchange=()=>{d.visible=toggle.checked;updateList();render()};row.classList.toggle('dataset-hidden',!d.visible);dot.type='color';dot.className='curve-color';dot.value=d.color;dot.ariaLabel='修改曲线颜色 '+d.name;dot.title='修改曲线、名称和连接线颜色';dot.oninput=()=>{d.color=dot.value;render()};s.textContent=`${d.name} · ${d.data.length} 点`;s.onclick=()=>{d.visible=!d.visible;updateList();render()};s.title=d.aggregate?'平均厚度曲线；来源：'+d.sources.join('、'):'点击显示／隐藏曲线';b.textContent='×';b.ariaLabel='移除 '+d.name;b.onclick=()=>{datasets=datasets.filter(x=>x.id!==d.id);updateList();render()};row.append(toggle,dot,s,b);$('datasets').append(row)})}
 function averageName(name){return 'AVE_'+name.replace(/^(?:AVE_)+/i,'')}
 function annotationText(name){return Array.from(name).reduce((lines,c,i)=>{if(i%48===0)lines.push('');lines[lines.length-1]+=c;return lines},[]).map(line=>line.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')).join('<br>')}
 function fmt(v){return Number.isFinite(v)?v.toFixed(4):'—'}
 function render(){let st;try{st=settings()}catch(e){say(e.message+'。图表仍显示上次有效结果。',true);return}const traces=[],shapes=[],annotations=[];$('readings').replaceChildren();let count=0;
  datasets.forEach(d=>{const f=PVB.evaluator(d.data,st.H,st.n,mode),ys=d.data.map(p=>f(p[0]));count+=ys.filter(Number.isFinite).length;traces.push({x:d.data.map(p=>p[0]),y:ys.map(v=>Number.isFinite(v)?v:null),name:d.name,legendgroup:String(d.id),visible:d.visible?true:'legendonly',type:'scatter',mode:'lines',connectgaps:false,line:{color:d.color,width:2},hovertemplate:'%{x:.2f} mm<br>%{y:.4f} '+(mode==='slope'?'mrad':'mm')+'<extra>%{fullData.name}</extra>'});st.eyes.forEach(([l,h],i)=>{const xs=[l,(l+h)/2,h],vals=xs.map(f),row=document.createElement('tr');[d.name,`EB${i+1} · ${l}–${h}`,...vals.map(fmt)].forEach(t=>{const td=document.createElement('td');td.textContent=t;row.append(td)});$('readings').append(row);traces.push({x:xs,y:vals.map(v=>Number.isFinite(v)?v:null),legendgroup:String(d.id),visible:d.visible?true:'legendonly',type:'scatter',mode:'markers',marker:{color:d.color,size:7,symbol:'diamond'},showlegend:false,name:d.name+' / EB'+(i+1),hovertemplate:'%{x:.2f} mm<br>%{y:.4f}<extra>%{fullData.name}</extra>'})})});
  st.eyes.forEach(([l,h],i)=>{shapes.push({type:'rect',xref:'x',yref:'paper',x0:l,x1:h,y0:0,y1:1,fillcolor:eyeColors[i],opacity:0.055,line:{width:0},layer:'below'});[l,h].forEach(x=>shapes.push({type:'line',xref:'x',yref:'paper',x0:x,x1:x,y0:0,y1:1,line:{color:eyeColors[i],width:1,dash:'dot'}}));annotations.push({xref:'x',yref:'paper',x:(l+h)/2,y:1.02+i*0.065,text:`EB${i+1} · ${l}–${h} mm`,showarrow:false,font:{color:eyeColors[i],size:12}})});
- let labelHeight=0;
  const averages=datasets.filter(d=>d.aggregate&&d.visible);
- const totalLabelHeight=averages.reduce((sum,d)=>sum+Math.ceil(Array.from(d.name).length/48)*18+12,0);
  const chartWidth=Math.max(240,$('chart').clientWidth-85);
  const legendRows=Math.max(1,Math.ceil(datasets.reduce((sum,d)=>sum+Math.min(chartWidth,Array.from(d.name).length*7+55),0)/chartWidth));
  const bottomMargin=85+legendRows*24;
  const plotHeight=420;
- const chartHeight=plotHeight+75+totalLabelHeight+bottomMargin;
+ const chartHeight=plotHeight+75+bottomMargin;
  $('chart').style.height=chartHeight+'px';
  averages.forEach((d,i)=>{
   const trace=traces.find(t=>t.legendgroup===String(d.id)&&t.mode==='lines');
@@ -27,13 +26,14 @@ function render(){let st;try{st=settings()}catch(e){say(e.message+'。图表仍�
   const points=trace.x.map((x,j)=>[x,trace.y[j]]).filter(([x,y])=>Number.isFinite(y)&&x>=range[0]&&x<=range[1]&&y>=yRange[0]&&y<=yRange[1]);
   const target=range[0]+(range[1]-range[0])*(i+1)/(averages.length+1);
   const point=points.reduce((best,p)=>!best||Math.abs(p[0]-target)<Math.abs(best[0]-target)?p:best,null);
-  const label={text:annotationText(d.name),align:'left',font:{color:d.color,size:12},bgcolor:'#fff',bordercolor:d.color,borderpad:4,xanchor:'left',yanchor:'bottom'};
-  if(point)Object.assign(label,{xref:'x',yref:'y',x:point[0],y:point[1],axref:'x',ayref:'y',ax:range[0],ay:yRange[1]+(yRange[1]-yRange[0])*(75+labelHeight)/plotHeight,showarrow:true,arrowhead:0,arrowwidth:1,arrowcolor:d.color});
-  else Object.assign(label,{xref:'paper',yref:'paper',x:0,y:1,yshift:75+labelHeight,showarrow:false});
-  annotations.push(label);labelHeight+=Math.ceil(Array.from(d.name).length/48)*18+12;
+  const label={name:'average-'+d.id,text:annotationText(d.name),align:'left',font:{color:d.color,size:12},bgcolor:'#fff',bordercolor:d.color,borderpad:4,xanchor:'center',yanchor:'middle'};
+  if(!point)return;
+  const position=d.labelPositions?.[mode]||{ax:range[0]+(range[1]-range[0])*0.5,ay:yRange[1]-(yRange[1]-yRange[0])*(0.15+(i%5)*0.15)};
+  Object.assign(label,{xref:'x',yref:'y',x:point[0],y:point[1],axref:'x',ayref:'y',...position,showarrow:true,arrowhead:0,arrowwidth:1,arrowcolor:d.color});
+  annotations.push(label);
  });
  if(!datasets.length)annotations.push({xref:'paper',yref:'paper',x:0.5,y:0.45,text:'导入 CSV / Excel 查看曲线',showarrow:false,font:{size:19,color:'#8095a5'}});
- Plotly.react('chart',traces,{height:chartHeight,margin:{l:65,r:20,t:75+labelHeight,b:bottomMargin},paper_bgcolor:'#fff',plot_bgcolor:'#fff',font:{family:'Segoe UI, Microsoft YaHei, sans-serif',color:'#425b6d'},xaxis:{title:'原始位置 / mm',range:viewRange||undefined,autorange:!viewRange,gridcolor:'#edf1f5',zeroline:false},yaxis:{range:yRange,autorange:false,title:mode==='slope'?'近似楔角 / mrad':'厚度 / mm',gridcolor:'#e7eef3',zerolinecolor:'#bdcdd8'},hovermode:'x unified',legend:{orientation:'h',y:-0.2,yanchor:'top',groupclick:'togglegroup'},shapes,annotations,uirevision:JSON.stringify([mode,viewRange,yRange,datasets.map(d=>d.id)])},{responsive:true,scrollZoom:true,displaylogo:false,modeBarButtonsToRemove:['lasso2d','select2d'],toImageButtonOptions:{filename:'PVB曲线',scale:2}});
+ Plotly.react('chart',traces,{height:chartHeight,margin:{l:65,r:20,t:75,b:bottomMargin},paper_bgcolor:'#fff',plot_bgcolor:'#fff',font:{family:'Segoe UI, Microsoft YaHei, sans-serif',color:'#425b6d'},xaxis:{title:'原始位置 / mm',range:viewRange||undefined,autorange:!viewRange,gridcolor:'#edf1f5',zeroline:false},yaxis:{range:yRange,autorange:false,title:mode==='slope'?'近似楔角 / mrad':'厚度 / mm',gridcolor:'#e7eef3',zerolinecolor:'#bdcdd8'},hovermode:'x unified',legend:{orientation:'h',y:-0.2,yanchor:'top',groupclick:'togglegroup'},shapes,annotations,uirevision:JSON.stringify([mode,viewRange,yRange,datasets.map(d=>d.id)])},{edits:{annotationTail:true},responsive:true,scrollZoom:true,displaylogo:false,modeBarButtonsToRemove:['lasso2d','select2d'],toImageButtonOptions:{filename:'PVB曲线',scale:2}});
  $('unit').textContent=mode==='slope'?'近似楔角 / mrad':'厚度 / mm';$('slope').classList.toggle('active',mode==='slope');$('thickness').classList.toggle('active',mode==='thickness');say(datasets.length?`${datasets.length} 个样本（显示 ${datasets.filter(d=>d.visible).length} 个） · ${mode==='slope'?st.H+' mm窗口':'厚度视图'} · ${st.n===1?'未平滑':st.n+'点平滑'} · ${count} 个有效曲线点${count?'':'，请检查窗口或数据范围'}`:'导入测量数据，或载入你的 CSV 示例开始分析。',datasets.length>0&&!count)
 }
 function download(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
@@ -51,6 +51,15 @@ render();
 
 $('chart').on('plotly_legendclick',e=>{const d=datasets.find(d=>String(d.id)===e.data[e.curveNumber].legendgroup);if(d){d.visible=!d.visible;updateList();render()}return false});
 $('chart').on('plotly_legenddoubleclick',()=>false);
+// Keep dragged label positions when settings or visibility cause a redraw.
+$('chart').on('plotly_relayout',changes=>{
+ if(!Object.keys(changes).some(key=>/^annotations\[\d+\]\.(ax|ay)$/.test(key)))return;
+ $('chart').layout.annotations.forEach(label=>{
+  if(!label.name?.startsWith('average-'))return;
+  const d=datasets.find(d=>label.name==='average-'+d.id);
+  if(d){d.labelPositions??={};d.labelPositions[mode]={ax:label.ax,ay:label.ay}}
+ });
+});
 
 // Combining samples is independent of their chart visibility.
 function averageSelection(){return [...$('average-options').querySelectorAll('input:checked')].map(e=>datasets.find(d=>d.id===Number(e.value))).filter(Boolean)}
@@ -69,7 +78,7 @@ $('average-create').onclick=()=>{try{
  settings();const selected=averageSelection(),data=PVB.average(selected.map(d=>d.data));
  const name=averageName($('average-name').value.trim()||`平均曲线 ${nextId}（${selected.length} 个样本）`);
  if($('average-only').checked)datasets.forEach(d=>d.visible=false);
- const combined={id:nextId++,name,data,visible:true,color:colors[datasets.length%colors.length],aggregate:true,sources:selected.map(d=>d.name)};
+ const combined={id:nextId++,name,data,visible:true,color:nextCurveColor(),aggregate:true,sources:selected.map(d=>d.name)};
  datasets.push(combined);updateList();$('average-dialog').close();render();
  say(`已生成「${name}」：${selected.length} 个样本的平均厚度，范围 ${data[0][0]}–${data[data.length-1][0]} mm；楔角沿用当前窗口和平滑设置。`);
 }catch(e){$('average-error').textContent=e.message}};

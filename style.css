@@ -3,3 +3,5 @@
 #datasets .dataset-toggle{width:16px;height:16px;padding:0;margin:0;flex-shrink:0;accent-color:#0e7490;cursor:pointer}#datasets span{cursor:pointer}#datasets .dataset-hidden span{color:#8795a2}#datasets .dataset-hidden .dot{opacity:.3}
 
 #average-options{max-height:280px;overflow:auto;margin-top:14px}.average-check{display:flex;align-items:flex-start;gap:8px;margin:10px 0;overflow-wrap:anywhere}.average-check input{width:16px;height:16px;flex-shrink:0;margin:3px 0;accent-color:#0e7490}#average-error{color:#b42318}#average-count{font-size:14px;color:#536978}
+
+#datasets .curve-color{width:26px;height:26px;min-width:26px;flex-shrink:0;padding:1px;margin:0;border:1px solid #cbd5e1;border-radius:4px;cursor:pointer;background:#fff}
