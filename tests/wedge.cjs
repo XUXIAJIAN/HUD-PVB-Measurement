@@ -24,3 +24,11 @@ const expected=P.applyAdjustments(data,edits.slice(1));assert.deepEqual(cancelle
 edits[0].active=true;assert.deepEqual(P.applyAdjustments(data,edits),all);
 edits.forEach(r=>r.active=false);assert.deepEqual(P.applyAdjustments(data,edits),data);
 console.log('PASS independent undo/restore with separated and overlapping intervals.');
+const sharedMean=P.average([data,data.map(([x,y])=>[x,y+.1])]);
+assert.ok(P.compatibleTemplate(template,sharedMean));
+sharedMean.forEach(([,y],i)=>assert.ok(Math.abs(y-data[i][1]-.05)<1e-12));
+assert.equal(P.compatibleTemplate(template,sharedMean.slice(1)),false);
+const missing=sharedMean.map(p=>p.slice());missing[10][1]=NaN;assert.equal(P.compatibleTemplate(template,missing),false);
+const plain=P.thicknessCSV(missing);assert.ok(plain.includes('\r\n10,\r\n'));assert.equal(P.csv(plain).length,1001);
+assert.ok(Number.isNaN(P.csv(plain)[10][1]));
+console.log('PASS mean accuracy, template compatibility, lossless-grid fallback and missing-data export.');

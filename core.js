@@ -66,5 +66,12 @@ function exportTemplate(template,data){
  }
  return Uint8Array.from(text,c=>c.charCodeAt(0));
 }
-const api={num,normalize,csv,at,smooth,evaluator,average,adjustWedge,applyAdjustments,csvTemplate,exportTemplate};root.PVB=api;if(typeof module!=='undefined')module.exports=api;
+function compatibleTemplate(template,data){
+ if(template.rows.length!==data.length||data.some(([,y])=>!Number.isFinite(y)))return false;
+ const positions=new Set(data.map(([x])=>x));return template.rows.every(r=>positions.has(r.x));
+}
+function thicknessCSV(data){
+ return '\uFEFFPosition_mm,Thickness_mm\r\n'+data.map(([x,y])=>x+','+(Number.isFinite(y)?Number(y.toFixed(8)):'')).join('\r\n')+'\r\n';
+}
+const api={num,normalize,csv,at,smooth,evaluator,average,adjustWedge,applyAdjustments,compatibleTemplate,thicknessCSV,csvTemplate,exportTemplate};root.PVB=api;if(typeof module!=='undefined')module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

@@ -75,10 +75,10 @@ $('average-all').onclick=()=>{$('average-options').querySelectorAll('input').for
 $('average-none').onclick=()=>{$('average-options').querySelectorAll('input').forEach(e=>e.checked=false);averageCount()};
 $('average-cancel').onclick=()=>$('average-dialog').close();
 $('average-create').onclick=()=>{try{
- settings();const selected=averageSelection(),data=PVB.average(selected.map(d=>d.data));
+ discardPreview();settings();const selected=averageSelection(),data=PVB.average(selected.map(d=>d.data));
  const name=averageName($('average-name').value.trim()||`平均曲线 ${nextId}（${selected.length} 个样本）`);
  if($('average-only').checked)datasets.forEach(d=>d.visible=false);
- const combined={id:nextId++,name,data,visible:true,color:nextCurveColor(),aggregate:true,sources:selected.map(d=>d.name)};
- datasets.push(combined);updateList();$('average-dialog').close();render();
+ const combined={id:nextId++,name,data,visible:true,color:nextCurveColor(),aggregate:true,sources:selected.map(d=>d.name),exportTemplates:selected.filter(d=>d.template&&PVB.compatibleTemplate(d.template,data)).map(d=>({name:d.name,template:d.template}))};
+ datasets.push(combined);updateList();$('edit-sample').value=String(combined.id);refreshExportFormats();renderAdjustments();$('average-dialog').close();editChanged();editMessage('已选择新生成的平均曲线，可直接预览并调整局部楔角。');
  say(`已生成「${name}」：${selected.length} 个样本的平均厚度，范围 ${data[0][0]}–${data[data.length-1][0]} mm；楔角沿用当前窗口和平滑设置。`);
 }catch(e){$('average-error').textContent=e.message}};

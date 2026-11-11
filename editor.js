@@ -6,13 +6,31 @@ function refreshEditor(){
  if(!$('edit-sample'))return;
  if(wedgePreview&&!datasets.includes(wedgePreview.dataset))wedgePreview=null;
  const selected=$('edit-sample').value;
- $('edit-sample').replaceChildren(...datasets.filter(d=>d.template).map(d=>new Option(d.name,String(d.id))));
+ $('edit-sample').replaceChildren(...datasets.filter(d=>d.template||d.aggregate).map(d=>new Option((d.aggregate?'平均曲线 · ':'')+d.name,String(d.id))));
  if([...$('edit-sample').options].some(o=>o.value===selected))$('edit-sample').value=selected;
  if(!$('edit-sample').options.length)$('edit-sample').add(new Option('请先导入 CSV',''));
- renderAdjustments();
+ refreshExportFormats();renderAdjustments();
 }
+function refreshExportFormats(){
+ const select=$('edit-format');if(!select)return;const d=editDataset();select.replaceChildren();
+ if(d?.template)select.add(new Option('导入 CSV 原格式','original'));
+ if(d?.aggregate){
+  (d.exportTemplates||[]).forEach((item,i)=>select.add(new Option('原格式模板：'+item.name,String(i))));
+  select.add(new Option('通用两列厚度 CSV（保留全部平均点）','plain'));
+ }
+ if([...select.options].some(o=>o.value===d?.exportChoice))select.value=d.exportChoice;
+ if(d)d.exportChoice=select.value;
+}
+function editOutput(d){
+ const choice=$('edit-format').value;
+ const item=d.template?{template:d.template,name:d.name}:choice==='plain'?null:d.exportTemplates?.[Number(choice)];
+ if(item){if(!PVB.compatibleTemplate(item.template,d.data))throw Error('当前曲线与模板位置不一致或含缺失厚度，请选择通用两列 CSV');return {bytes:PVB.exportTemplate(item.template,d.data),label:'原格式：'+item.name,template:true}}
+ if(!d.aggregate)throw Error('没有可用的导出格式');
+ return {bytes:PVB.thicknessCSV(d.data),label:'通用两列厚度 CSV',template:false};
+}
+$('edit-format').onchange=()=>{const d=editDataset();if(d)d.exportChoice=$('edit-format').value};
 function discardPreview(){if(wedgePreview){wedgePreview.dataset.data=wedgePreview.base;wedgePreview=null}}
-function editParameters(){const d=editDataset();if(!d)throw Error('请先导入并选择 CSV 样本（Excel 和平均曲线不支持原格式导出）');return {d,start:PVB.num($('edit-start').value),end:PVB.num($('edit-end').value),value:PVB.num($('edit-value').value),kind:$('edit-kind').value,...settings()}}
+function editParameters(){const d=editDataset();if(!d)throw Error('请先导入 CSV 或生成平均曲线，再选择要调整的曲线');return {d,start:PVB.num($('edit-start').value),end:PVB.num($('edit-end').value),value:PVB.num($('edit-value').value),kind:$('edit-kind').value,...settings()}}
 function editMessage(text,error=false){$('edit-result').textContent=text;$('edit-result').classList.toggle('error',error)}
 function previewWedge(){
  discardPreview();const p=editParameters();const result=PVB.adjustWedge(p.d.data,p.start,p.end,p.value,p.kind,p.H,p.n);
@@ -49,18 +67,19 @@ $('edit-undo').onclick=()=>{discardPreview();const d=editDataset();const record=
 $('edit-reset').onclick=()=>{discardPreview();const d=editDataset();if(d?.original){d.data=d.original.map(p=>p.slice());d.history=[];delete d.original;render();renderAdjustments();editMessage('已恢复原始厚度数据。')}};
 $('edit-export').onclick=()=>{try{
  if(wedgePreview)throw Error('当前为预览，请先应用调整再导出');
- const d=editDataset();if(!d?.template)throw Error('请先选择导入的 CSV 样本');
+ const d=editDataset();if(!d)throw Error('请先选择 CSV 或平均曲线');
+ const output=editOutput(d);
  const records=(d.history||[]).filter(r=>r.active);
- $('export-summary').textContent=`样本：${d.name}\n数据点：${d.data.length}\n保留 ${records.length} 段调整：\n`+records.map(r=>`#${r.id}：${r.start}–${r.end} mm，${r.kind==='target'?'目标平均':'增量'} ${r.value} mrad`).join('\n')+'\n已撤销的调整不计入导出。保留原始表头和厚度小数位。';
+ $('export-summary').textContent=`样本：${d.name}\n数据点：${d.data.length}\n导出格式：${output.label}\n${d.aggregate?'平均来源：'+d.sources.join('、')+'\n':''}保留 ${records.length} 段调整：\n`+records.map(r=>`#${r.id}：${r.start}–${r.end} mm，${r.kind==='target'?'目标平均':'增量'} ${r.value} mrad`).join('\n')+'\n已撤销的调整不计入导出。'+(output.template?'保留模板的原始表头及厚度小数位；表头是源文件记录，不代表平均结果。':'导出位置和厚度两列，缺失厚度留空，小数最多八位。');
  $('export-confirm').showModal();
 }catch(e){editMessage(e.message,true)}};
 $('export-cancel').onclick=()=>$('export-confirm').close();
 $('export-confirm-save').onclick=()=>{try{
- const d=editDataset();if(!d?.template||wedgePreview)throw Error('数据状态已变化，请重新确认');
- download(new Blob([PVB.exportTemplate(d.template,d.data)],{type:'text/csv'}),d.name.replace(/\.csv$/i,'')+'_adjusted.csv');
- $('export-confirm').close();editMessage('已确认并导出所有保留的调整；仪器表头保持原始记录。');
+ const d=editDataset();if(!d||wedgePreview)throw Error('数据状态已变化，请重新确认');
+ download(new Blob([editOutput(d).bytes],{type:'text/csv;charset=utf-8'}),d.name.replace(/\.csv$/i,'')+'_adjusted.csv');
+ $('export-confirm').close();editMessage('已确认并导出当前曲线及所有保留的调整。');
 }catch(e){$('export-confirm').close();editMessage(e.message,true)}};
-function editChanged(){discardPreview();render();renderAdjustments();editMessage('参数已更新，点击“预览调整”查看效果。');try{const p=editParameters();const r=PVB.adjustWedge(p.d.data,p.start,p.end,p.value,p.kind,p.H,p.n);$('edit-summary').textContent=`当前区间平均 ${r.before.toFixed(5)} mrad；预期 ${r.after.toFixed(5)} mrad。`}catch(e){$('edit-summary').textContent=e.message}}
+function editChanged(){discardPreview();render();refreshExportFormats();renderAdjustments();editMessage('参数已更新，点击“预览调整”查看效果。');try{const p=editParameters();const r=PVB.adjustWedge(p.d.data,p.start,p.end,p.value,p.kind,p.H,p.n);$('edit-summary').textContent=`当前区间平均 ${r.before.toFixed(5)} mrad；预期 ${r.after.toFixed(5)} mrad。`}catch(e){$('edit-summary').textContent=e.message}}
 for(const id of ['edit-start','edit-end','edit-value','edit-kind'])$(id).addEventListener('input',()=>{$('edit-slider').value=$('edit-value').value;editChanged()});
 $('edit-slider').oninput=()=>{$('edit-value').value=$('edit-slider').value;editChanged()};
 $('edit-sample').onchange=editChanged;
