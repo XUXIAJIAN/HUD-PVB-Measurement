@@ -37,6 +37,11 @@ function adjustWedge(data,start,end,value,kind,H=60,n=1){
  const f=evaluator(result,H,n,'slope');
  return {data:result,delta,before:mean,after:xs.reduce((a,x)=>a+f(x),0)/xs.length,offset:delta*(end-start)/1000};
 }
+function applyAdjustments(original,records){
+ const result=original.map(([x,y])=>[x,Number.isFinite(y)?y+records.filter(r=>r.active).reduce((sum,r)=>sum+r.delta*Math.max(0,Math.min(x-r.start,r.end-r.start))/1000,0):NaN]);
+ if(result.some(([,y])=>Number.isFinite(y)&&y<=0))throw Error('此操作会产生非正厚度，请先撤销其他相关调整');
+ return result;
+}
 // Work on binary strings to preserve header encoding and original line endings.
 function csvTemplate(bytes){
  const text=Array.from(bytes,b=>String.fromCharCode(b)).join('');
@@ -61,5 +66,5 @@ function exportTemplate(template,data){
  }
  return Uint8Array.from(text,c=>c.charCodeAt(0));
 }
-const api={num,normalize,csv,at,smooth,evaluator,average,adjustWedge,csvTemplate,exportTemplate};root.PVB=api;if(typeof module!=='undefined')module.exports=api;
+const api={num,normalize,csv,at,smooth,evaluator,average,adjustWedge,applyAdjustments,csvTemplate,exportTemplate};root.PVB=api;if(typeof module!=='undefined')module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);
