@@ -5,3 +5,6 @@
 #average-options{max-height:280px;overflow:auto;margin-top:14px}.average-check{display:flex;align-items:flex-start;gap:8px;margin:10px 0;overflow-wrap:anywhere}.average-check input{width:16px;height:16px;flex-shrink:0;margin:3px 0;accent-color:#0e7490}#average-error{color:#b42318}#average-count{font-size:14px;color:#536978}
 
 #datasets .curve-color{width:26px;height:26px;min-width:26px;flex-shrink:0;padding:1px;margin:0;border:1px solid #cbd5e1;border-radius:4px;cursor:pointer;background:#fff}
+
+.wedge-editor{background:linear-gradient(145deg,#ecfbfd,#f7faff)}.edit-pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}.edit-pair input{min-width:0}#edit-slider{padding:0;accent-color:#0e7490}.edit-actions{margin:12px 0}.edit-actions button{flex:1}#edit-result{font-size:13px;color:#126579;overflow-wrap:anywhere}#edit-result.error{color:#b42318}.wedge-editor h2{color:#0e7490}
+aside{min-width:0}select{min-width:0}.edit-actions button{padding:8px 6px;white-space:nowrap}.wedge-editor .secondary{margin-top:6px}@media(max-width:720px){main{grid-template-columns:minmax(0,1fr)}#chart{overflow:hidden}.below{flex-wrap:wrap}}

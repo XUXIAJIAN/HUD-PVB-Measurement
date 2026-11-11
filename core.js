@@ -19,5 +19,47 @@ function average(series){
  });
  return normalize(rows);
 }
-const api={num,normalize,csv,at,smooth,evaluator,average};root.PVB=api;if(typeof module!=='undefined')module.exports=api;
+// Integral of a local slope increment; thickness stays continuous at both ends.
+function adjustWedge(data,start,end,value,kind,H=60,n=1){
+ if(![start,end,value].every(Number.isFinite)||start>=end)throw Error('请输入有效区间和楔角，起点必须小于终点');
+ if(start<data[0][0]||end>data[data.length-1][0])throw Error('调整区间必须在样本位置范围内');
+ const ramp=x=>Math.max(0,Math.min(x-start,end-start))/1000;
+ const baseline=evaluator(data,H,n,'slope');
+ const unit=evaluator(data.map(([x,y])=>[x,Number.isFinite(y)?ramp(x):NaN]),H,n,'slope');
+ const xs=data.map(p=>p[0]).filter(x=>x>=start&&x<=end&&Number.isFinite(baseline(x))&&Number.isFinite(unit(x)));
+ if(!xs.length)throw Error('区间内无有效楔角，请扩大区间或减小计算窗口');
+ const mean=xs.reduce((a,x)=>a+baseline(x),0)/xs.length;
+ const gain=xs.reduce((a,x)=>a+unit(x),0)/xs.length;
+ if(gain<=0)throw Error('该区间无法调整');
+ const delta=kind==='target'?(value-mean)/gain:value;
+ const result=data.map(([x,y])=>[x,Number.isFinite(y)?y+delta*ramp(x):NaN]);
+ if(result.some(([,y])=>Number.isFinite(y)&&y<=0))throw Error('调整后出现非正厚度，请减小调整幅度');
+ const f=evaluator(result,H,n,'slope');
+ return {data:result,delta,before:mean,after:xs.reduce((a,x)=>a+f(x),0)/xs.length,offset:delta*(end-start)/1000};
+}
+// Work on binary strings to preserve header encoding and original line endings.
+function csvTemplate(bytes){
+ const text=Array.from(bytes,b=>String.fromCharCode(b)).join('');
+ const marker=/^\[Data\][ \t]*\r?$/m.exec(text);let offset=marker?marker.index+marker[0].length:0;
+ const rows=[];const pattern=/[^\r\n]+/g;pattern.lastIndex=offset;let m;
+ while((m=pattern.exec(text))){
+  const match=/^(\s*"?[-+]?\d+(?:\.\d+)?"?\s*[,;\t])(\s*)("?)([-+]?(?:\d+(?:\.\d*)?|\.\d+))("?)([^\r\n]*)$/.exec(m[0]);
+  if(!match)continue;
+  const x=Number(match[1].slice(0,-1).trim().replace(/"/g,'')),y=Number(match[4]);
+  if(!Number.isFinite(x)||!Number.isFinite(y))continue;
+  rows.push({x,y,start:m.index+match[1].length+match[2].length+match[3].length,length:match[4].length,precision:(match[4].split('.')[1]||'').length});
+ }
+ if(rows.length<2)throw Error('无法保留此 CSV 的原始格式；请使用两列数值或 [Data] 格式');
+ normalize(rows.map(r=>[r.x,r.y]));return {text,rows};
+}
+function exportTemplate(template,data){
+ const values=new Map(data);let text=template.text;
+ for(const row of [...template.rows].reverse()){
+  const y=values.get(row.x);if(!Number.isFinite(y))throw Error('导出数据与原始位置不匹配');
+  if(y===row.y)continue;
+  text=text.slice(0,row.start)+y.toFixed(row.precision)+text.slice(row.start+row.length);
+ }
+ return Uint8Array.from(text,c=>c.charCodeAt(0));
+}
+const api={num,normalize,csv,at,smooth,evaluator,average,adjustWedge,csvTemplate,exportTemplate};root.PVB=api;if(typeof module!=='undefined')module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);
