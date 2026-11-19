@@ -4,6 +4,23 @@ function normalize(rows){const data=rows.map(([x,y])=>[num(x),num(y)]).filter(p=
 function csv(text){const lines=text.replace(/^\uFEFF/,'').split(/\r?\n/);const start=lines.findIndex(x=>x.trim()==='[Data]');const rows=lines.slice(start>=0?start+1:0).filter(x=>x.trim()).map(x=>x.split(/[,;\t]/).map(v=>v.trim().replace(/^"|"$/g,''))).filter(r=>Number.isFinite(num(r[0])));return normalize(rows)}
 function at(data,x){if(!data.length||x<data[0][0]||x>data[data.length-1][0])return NaN;let l=0,r=data.length-1;while(l<r){const m=(l+r)>>1;if(data[m][0]<x)l=m+1;else r=m}if(data[l][0]===x)return data[l][1];if(!l)return NaN;const a=data[l-1],b=data[l];return a[1]+(b[1]-a[1])*(x-a[0])/(b[0]-a[0])}
 function smooth(data,n){if(n===1)return data;const h=(n-1)/2;return data.map(([x],i)=>{if(i<h||i+h>=data.length)return[x,NaN];let sum=0;for(let j=i-h;j<=i+h;j++)sum+=data[j][1];return[x,sum/n]})}
+function savitzkyGolay(values, points){
+ const half=(points-1)/2;
+ const offsets=Array.from({length:points},(_,i)=>i-half);
+ const sum2=offsets.reduce((sum,k)=>sum+k**2,0);
+ const sum4=offsets.reduce((sum,k)=>sum+k**4,0);
+ // In a centered cubic fit, the odd terms cancel at the middle point.
+ const weights=offsets.map(k=>(sum4-sum2*k**2)/(points*sum4-sum2**2));
+ let finiteRun=0;
+ const result=Array(values.length).fill(null);
+ for(let end=0;end<values.length;end++){
+  finiteRun=Number.isFinite(values[end])?finiteRun+1:0;
+  if(finiteRun<points)continue;
+  const start=end-points+1;
+  result[start+half]=weights.reduce((sum,weight,i)=>sum+weight*values[start+i],0);
+ }
+ return result;
+}
 function evaluator(data,H,n,mode){if(!Number.isFinite(H)||H<=0)throw Error('斜率窗口必须大于0');if(!Number.isInteger(n)||n<1||n%2!==1)throw Error('平滑点数必须为正奇数');const d=smooth(data,n);return x=>mode==='thickness'?at(d,x):(at(d,x+H/2)-at(d,x-H/2))/H*1000}
 // Keep every source knot so linear interpolation of the mean stays exact.
 function average(series){
@@ -73,5 +90,5 @@ function compatibleTemplate(template,data){
 function thicknessCSV(data){
  return '\uFEFFPosition_mm,Thickness_mm\r\n'+data.map(([x,y])=>x+','+(Number.isFinite(y)?Number(y.toFixed(8)):'')).join('\r\n')+'\r\n';
 }
-const api={num,normalize,csv,at,smooth,evaluator,average,adjustWedge,applyAdjustments,compatibleTemplate,thicknessCSV,csvTemplate,exportTemplate};root.PVB=api;if(typeof module!=='undefined')module.exports=api;
+const api={num,normalize,csv,at,smooth,savitzkyGolay,evaluator,average,adjustWedge,applyAdjustments,compatibleTemplate,thicknessCSV,csvTemplate,exportTemplate};root.PVB=api;if(typeof module!=='undefined')module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);
