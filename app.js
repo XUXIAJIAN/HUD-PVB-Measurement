@@ -12,18 +12,22 @@ function annotationText(name){return Array.from(name).reduce((lines,c,i)=>{if(i%
 function fmt(v){return Number.isFinite(v)?v.toFixed(4):'—'}
 function render(){let st;try{st=settings()}catch(e){say(e.message+'。图表仍显示上次有效结果。',true);return}const traces=[],shapes=[],annotations=[];$('readings').replaceChildren();let count=0;
  const sgPoints=mode==='slope'?Number($('sg-preview').value):0;
- datasets.forEach(d=>{if(d.original){const original=PVB.evaluator(d.original,st.H,st.n,mode);traces.push({x:d.original.map(p=>p[0]),y:d.original.map(p=>{const v=original(p[0]);return Number.isFinite(v)?v:null}),name:d.name+' · 调整前',type:'scatter',mode:'lines',visible:d.visible?true:'legendonly',line:{color:d.color,width:1,dash:'dot'},opacity:0.55,connectgaps:false,hovertemplate:'调整前 %{y:.5f}<extra></extra>'})}const f=PVB.evaluator(d.data,st.H,st.n,mode),ys=d.data.map(p=>f(p[0]));count+=ys.filter(Number.isFinite).length;traces.push({x:d.data.map(p=>p[0]),y:ys.map(v=>Number.isFinite(v)?v:null),name:d.name,legendgroup:String(d.id),visible:d.visible?true:'legendonly',type:'scatter',mode:'lines',connectgaps:false,line:{color:d.color,width:2},hovertemplate:'%{x:.2f} mm<br>%{y:.4f} '+(mode==='slope'?'mrad':'mm')+'<extra>%{fullData.name}</extra>'});
+ const sgOnlyButton=$('sg-only');
+ const sgOnly=sgPoints>0&&sgOnlyButton.getAttribute('aria-pressed')==='true';
+ sgOnlyButton.disabled=!sgPoints;
+ sgOnlyButton.textContent=sgOnly?'恢复叠加显示':'仅显示 SG 曲线';
+ datasets.forEach(d=>{if(d.original&&!sgOnly){const original=PVB.evaluator(d.original,st.H,st.n,mode);traces.push({x:d.original.map(p=>p[0]),y:d.original.map(p=>{const v=original(p[0]);return Number.isFinite(v)?v:null}),name:d.name+' · 调整前',type:'scatter',mode:'lines',visible:d.visible?true:'legendonly',line:{color:d.color,width:1,dash:'dot'},opacity:0.55,connectgaps:false,hovertemplate:'调整前 %{y:.5f}<extra></extra>'})}const f=PVB.evaluator(d.data,st.H,st.n,mode),ys=d.data.map(p=>f(p[0]));count+=ys.filter(Number.isFinite).length;if(!sgOnly)traces.push({x:d.data.map(p=>p[0]),y:ys.map(v=>Number.isFinite(v)?v:null),name:d.name,legendgroup:String(d.id),visible:d.visible?true:'legendonly',type:'scatter',mode:'lines',connectgaps:false,line:{color:d.color,width:2},hovertemplate:'%{x:.2f} mm<br>%{y:.4f} '+(mode==='slope'?'mrad':'mm')+'<extra>%{fullData.name}</extra>'});
  if(sgPoints){
   const preview=PVB.savitzkyGolay(ys,sgPoints);
-  if(preview.some(Number.isFinite))traces.push({
-   x:d.data.map(p=>p[0]),y:preview,name:d.name+' · SG '+sgPoints+' 点',
+  if(sgOnly||preview.some(Number.isFinite))traces.push({
+   x:d.data.map(p=>p[0]),y:preview,name:sgOnly?d.name:d.name+' · SG '+sgPoints+' 点',
    legendgroup:String(d.id),visible:d.visible?true:'legendonly',
-   type:'scatter',mode:'lines',showlegend:false,connectgaps:false,
+   type:'scatter',mode:'lines',showlegend:sgOnly,connectgaps:false,
    line:{color:d.color,width:2.5,dash:'dash'},
    hovertemplate:'%{x:.2f} mm<br>%{y:.4f} mrad<extra>%{fullData.name}</extra>'
   });
  }
- st.eyes.forEach(([l,h],i)=>{const xs=[l,(l+h)/2,h],vals=xs.map(f),row=document.createElement('tr');[d.name,`EB${i+1} · ${l}–${h}`,...vals.map(fmt)].forEach(t=>{const td=document.createElement('td');td.textContent=t;row.append(td)});$('readings').append(row);traces.push({x:xs,y:vals.map(v=>Number.isFinite(v)?v:null),legendgroup:String(d.id),visible:d.visible?true:'legendonly',type:'scatter',mode:'markers',marker:{color:d.color,size:7,symbol:'diamond'},showlegend:false,name:d.name+' / EB'+(i+1),hovertemplate:'%{x:.2f} mm<br>%{y:.4f}<extra>%{fullData.name}</extra>'})})});
+ st.eyes.forEach(([l,h],i)=>{const xs=[l,(l+h)/2,h],vals=xs.map(f),row=document.createElement('tr');[d.name,`EB${i+1} · ${l}–${h}`,...vals.map(fmt)].forEach(t=>{const td=document.createElement('td');td.textContent=t;row.append(td)});$('readings').append(row);if(!sgOnly)traces.push({x:xs,y:vals.map(v=>Number.isFinite(v)?v:null),legendgroup:String(d.id),visible:d.visible?true:'legendonly',type:'scatter',mode:'markers',marker:{color:d.color,size:7,symbol:'diamond'},showlegend:false,name:d.name+' / EB'+(i+1),hovertemplate:'%{x:.2f} mm<br>%{y:.4f}<extra>%{fullData.name}</extra>'})})});
  st.eyes.forEach(([l,h],i)=>{shapes.push({type:'rect',xref:'x',yref:'paper',x0:l,x1:h,y0:0,y1:1,fillcolor:eyeColors[i],opacity:0.055,line:{width:0},layer:'below'});[l,h].forEach(x=>shapes.push({type:'line',xref:'x',yref:'paper',x0:x,x1:x,y0:0,y1:1,line:{color:eyeColors[i],width:1,dash:'dot'}}));annotations.push({xref:'x',yref:'paper',x:(l+h)/2,y:1.02+i*0.065,text:`EB${i+1} · ${l}–${h} mm`,showarrow:false,font:{color:eyeColors[i],size:12}})});
  const averages=datasets.filter(d=>d.aggregate&&d.visible);
  const chartWidth=Math.max(240,$('chart').clientWidth-85);
@@ -39,8 +43,11 @@ function render(){let st;try{st=settings()}catch(e){say(e.message+'。图表仍�
   const target=range[0]+(range[1]-range[0])*(i+1)/(averages.length+1);
   const point=points.reduce((best,p)=>!best||Math.abs(p[0]-target)<Math.abs(best[0]-target)?p:best,null);
   const label={name:'average-'+d.id,text:annotationText(d.name),align:'left',font:{color:d.color,size:12},bgcolor:'#fff',bordercolor:d.color,borderpad:4,xanchor:'center',yanchor:'middle'};
-  if(!point)return;
   const position=d.labelPositions?.[mode]||{ax:range[0]+(range[1]-range[0])*0.5,ay:yRange[1]-(yRange[1]-yRange[0])*(0.15+(i%5)*0.15)};
+  if(!point){
+   if(sgOnly)annotations.push({...label,xref:'x',yref:'y',x:position.ax,y:position.ay,showarrow:false});
+   return;
+  }
   Object.assign(label,{xref:'x',yref:'y',x:point[0],y:point[1],axref:'x',ayref:'y',...position,showarrow:true,arrowhead:0,arrowwidth:1,arrowcolor:d.color});
   annotations.push(label);
  });
@@ -55,7 +62,16 @@ $('sheet').onchange=columns;$('headerrow').onchange=columns;$('mapping').addEven
 $('addmap').onclick=()=>{try{const h=Number($('headerrow').value)-1,x=Number($('xcol').value),off=PVB.num($('offset').value),ys=[...$('ycols').selectedOptions].map(o=>Number(o.value));if(!Number.isInteger(h)||h<0||!Number.isFinite(off)||!ys.length||ys.includes(x))throw Error('请选择有效的表头、位置列、厚度列和偏移');const rows=currentBook.rows;if(h>=rows.length)throw Error('表头行超出范围');const added=[],skipped=[];for(const y of ys){const pairs=rows.slice(h+1).filter(r=>Number.isFinite(PVB.num(r[x]))).map(r=>[PVB.num(r[x])+off,r[y]]);if(!pairs.some(p=>Number.isFinite(PVB.num(p[1])))){skipped.push(rows[h][y]);continue}added.push([`${currentBook.name} / ${rows[h][y]}`,PVB.normalize(pairs)])}if(!added.length)throw Error('所选列没有可读取的数值厚度');added.forEach(([n,d])=>add(n,d));$('mapping').close();render();if(skipped.length)say('已导入有效厚度列；跳过空列：'+skipped.join('、'))}catch(e){$('maperror').textContent=e.message}};
 async function importFiles(files){for(const file of files){try{if(/\.csv$/i.test(file.name)){const bytes=new Uint8Array(await file.arrayBuffer());let template=null;try{template=PVB.csvTemplate(bytes)}catch{}add(file.name,PVB.csv(new TextDecoder().decode(bytes)),template);render()}else if(/\.xlsx?$/i.test(file.name)){await mapBook(XLSX.read(await file.arrayBuffer(),{type:'array'}),file.name)}else throw Error('仅支持 CSV、XLSX、XLS 文件')}catch(e){say(file.name+'：'+e.message,true)}}}
 $('files').onchange=e=>{const files=[...e.target.files];importQueue=importQueue.then(()=>importFiles(files));e.target.value=''};$('drop').ondragover=e=>e.preventDefault();$('drop').ondrop=e=>{e.preventDefault();const files=[...e.dataTransfer.files];importQueue=importQueue.then(()=>importFiles(files))};
-$('sample').onclick=()=>{if(datasets.some(d=>d.name==='data202609031152763.csv')){say('示例已载入');return}add('data202609031152763.csv',PVB.csv(window.PVB_SAMPLE));render()};$('clear').onclick=()=>{datasets=[];updateList();render()};['window','smooth','sg-preview'].forEach(id=>$(id).onchange=render);['slope','thickness'].forEach(id=>$(id).onclick=()=>{mode=id;render()});
+$('sample').onclick=()=>{if(datasets.some(d=>d.name==='data202609031152763.csv')){say('示例已载入');return}add('data202609031152763.csv',PVB.csv(window.PVB_SAMPLE));render()};$('clear').onclick=()=>{datasets=[];updateList();render()};['window','smooth'].forEach(id=>$(id).onchange=render);
+$('sg-preview').onchange=()=>{
+ if($('sg-preview').value==='0')$('sg-only').setAttribute('aria-pressed','false');
+ render();
+};
+$('sg-only').onclick=()=>{
+ const button=$('sg-only');
+ button.setAttribute('aria-pressed',String(button.getAttribute('aria-pressed')!=='true'));
+ render();
+};['slope','thickness'].forEach(id=>$(id).onclick=()=>{mode=id;render()});
 $('range').onclick=()=>{const l=PVB.num($('xmin').value),h=PVB.num($('xmax').value);if(!Number.isFinite(l)||!Number.isFinite(h)||l>=h){say('显示起点必须小于终点',true);return}viewRange=[l,h];render()};$('yrange').onclick=()=>{const l=PVB.num($('ymin').value),h=PVB.num($('ymax').value);if(!Number.isFinite(l)||!Number.isFinite(h)||l>=h){say('纵坐标最小值必须小于最大值',true);return}yRange=[l,h];render();Plotly.relayout('chart',{'yaxis.range':yRange,'yaxis.autorange':false})};$('reset').onclick=()=>{viewRange=[250,800];yRange=[0,1];$('ymin').value='0';$('ymax').value='1';$('xmin').value='250';$('xmax').value='800';render();Plotly.relayout('chart',{'xaxis.range':[250,800],'xaxis.autorange':false,'yaxis.range':[0,1],'yaxis.autorange':false})};$('png').onclick=()=>{try{settings()}catch(e){say(e.message,true);return}if(!datasets.length){say('请先导入数据',true);return}Plotly.downloadImage('chart',{format:'png',filename:'PVB_'+mode,width:1500,height:Math.max(800,$('chart').clientHeight),scale:2})};
 $('export').onclick=()=>{try{if(!datasets.length)throw Error('请先导入数据');const st=settings(),lines=['样本,位置_mm,数值,单位,窗口_mm,平滑点数'];const quote=s=>'"'+String(s).replace(/"/g,'""')+'"';datasets.forEach(d=>{const f=PVB.evaluator(d.data,st.H,st.n,mode);d.data.forEach(([x])=>{const y=f(x);lines.push([quote(/^[=+@-]/.test(d.name)?"'"+d.name:d.name),x,Number.isFinite(y)?y:'',mode==='slope'?'mrad':'mm',st.H,st.n].join(','))})});download(new Blob(['\uFEFF'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'}),'PVB_'+mode+'.csv')}catch(e){say(e.message,true)}};
 if(document.modelContext?.registerTool){try{Promise.resolve(document.modelContext.registerTool({name:'read_pvb_settings',description:'读取本地PVB曲线的当前计算设置和眼盒边界',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:true},execute:()=>({...settings(),mode,samples:datasets.map(d=>({name:d.name,points:d.data.length}))})})).catch(()=>{})}catch{}}
