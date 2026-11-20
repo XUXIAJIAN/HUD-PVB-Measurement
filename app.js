@@ -16,14 +16,14 @@ function render(){let st;try{st=settings()}catch(e){say(e.message+'。图表仍�
  const sgOnly=sgPoints>0&&sgOnlyButton.getAttribute('aria-pressed')==='true';
  sgOnlyButton.disabled=!sgPoints;
  sgOnlyButton.textContent=sgOnly?'恢复叠加显示':'仅显示 SG 曲线';
- datasets.forEach(d=>{if(d.original&&!sgOnly){const original=PVB.evaluator(d.original,st.H,st.n,mode);traces.push({x:d.original.map(p=>p[0]),y:d.original.map(p=>{const v=original(p[0]);return Number.isFinite(v)?v:null}),name:d.name+' · 调整前',type:'scatter',mode:'lines',visible:d.visible?true:'legendonly',line:{color:d.color,width:1,dash:'dot'},opacity:0.55,connectgaps:false,hovertemplate:'调整前 %{y:.5f}<extra></extra>'})}const f=PVB.evaluator(d.data,st.H,st.n,mode),ys=d.data.map(p=>f(p[0]));count+=ys.filter(Number.isFinite).length;if(!sgOnly)traces.push({x:d.data.map(p=>p[0]),y:ys.map(v=>Number.isFinite(v)?v:null),name:d.name,legendgroup:String(d.id),visible:d.visible?true:'legendonly',type:'scatter',mode:'lines',connectgaps:false,line:{color:d.color,width:2},hovertemplate:'%{x:.2f} mm<br>%{y:.4f} '+(mode==='slope'?'mrad':'mm')+'<extra>%{fullData.name}</extra>'});
+ datasets.forEach(d=>{if(d.original&&!sgOnly){const original=PVB.evaluator(d.original,st.H,st.n,mode);traces.push({x:d.original.map(p=>p[0]),y:d.original.map(p=>{const v=original(p[0]);return Number.isFinite(v)?v:null}),name:d.name+' · 调整前',type:'scatter',mode:'lines',visible:d.visible?true:'legendonly',line:{color:d.color,width:1,dash:'dot'},opacity:0.55,connectgaps:false,hovertemplate:'调整前 %{y:.5f}<extra></extra>'})}const f=PVB.evaluator(d.data,st.H,st.n,mode),ys=d.data.map(p=>f(p[0]));count+=ys.filter(Number.isFinite).length;if(!sgOnly)traces.push({x:d.data.map(p=>p[0]),y:ys.map(v=>Number.isFinite(v)?v:null),name:d.name,legendgroup:String(d.id),visible:d.visible?true:'legendonly',type:'scatter',mode:'lines',connectgaps:false,line:{color:d.color,width:2,dash:sgPoints?'dash':'solid'},hovertemplate:'%{x:.2f} mm<br>%{y:.4f} '+(mode==='slope'?'mrad':'mm')+'<extra>%{fullData.name}</extra>'});
  if(sgPoints){
   const preview=PVB.savitzkyGolay(ys,sgPoints);
   if(sgOnly||preview.some(Number.isFinite))traces.push({
    x:d.data.map(p=>p[0]),y:preview,name:sgOnly?d.name:d.name+' · SG '+sgPoints+' 点',
    legendgroup:String(d.id),visible:d.visible?true:'legendonly',
    type:'scatter',mode:'lines',showlegend:sgOnly,connectgaps:false,
-   line:{color:d.color,width:2.5,dash:'dash'},
+   line:{color:d.color,width:2.5,dash:'solid'},
    hovertemplate:'%{x:.2f} mm<br>%{y:.4f} mrad<extra>%{fullData.name}</extra>'
   });
  }
